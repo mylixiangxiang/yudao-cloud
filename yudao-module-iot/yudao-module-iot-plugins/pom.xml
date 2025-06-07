@@ -12,6 +12,7 @@
         <module>yudao-module-iot-plugin-http</module>
         <module>yudao-module-iot-plugin-mqtt</module>
         <module>yudao-module-iot-plugin-emqx</module>
+        <module>yudao-module-iot-plugin-tcp</module>
     </modules>
 
     <modelVersion>4.0.0</modelVersion>

@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: yudao-module-iot-plugin-tcp
+
+yudao:
+  iot:
+    plugin:
+      common:
+        upstream-url: http://127.0.0.1:48080
+        downstream-port: 8098
+        plugin-key: yudao-module-iot-plugin-tcp
+      tcp:
+        server-port: 8099
