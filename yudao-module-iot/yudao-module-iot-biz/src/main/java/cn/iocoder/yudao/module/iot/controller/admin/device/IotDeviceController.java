@@ -6,6 +6,8 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
+import cn.iocoder.yudao.module.iot.api.device.IotDeviceUpstreamApi;
+import cn.iocoder.yudao.module.iot.api.device.dto.control.upstream.IotDeviceStateUpdateReqDTO;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.control.IotDeviceDownstreamReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.control.IotDeviceUpstreamReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.device.*;
@@ -17,11 +19,15 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.annotation.security.PermitAll;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
+import org.springframework.context.annotation.Bean;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -42,10 +48,14 @@ public class IotDeviceController {
     @Resource
     private IotDeviceService deviceService;
     @Resource
+    private IotDeviceUpstreamApi iotDeviceUpstreamApi;
+    @Resource
     private IotDeviceUpstreamService deviceUpstreamService;
     @Resource
     private IotDeviceDownstreamService deviceDownstreamService;
 
+    @Resource
+    private RestTemplate restTemplate;
     @PostMapping("/create")
     @Operation(summary = "创建设备")
     @PreAuthorize("@ss.hasPermission('iot:device:create')")
@@ -168,7 +178,6 @@ public class IotDeviceController {
         deviceUpstreamService.upstreamDevice(upstreamReqVO);
         return success(true);
     }
-
     @PostMapping("/downstream")
     @Operation(summary = "设备下行", description = "可用于设备模拟")
     @PreAuthorize("@ss.hasPermission('iot:device:downstream')")
@@ -185,4 +194,23 @@ public class IotDeviceController {
         return success(deviceService.getMqttConnectionParams(deviceId));
     }
 
+    @GetMapping("/test/{deviceId}")
+    @Operation(summary = "获取 MQTT 连接参数")
+    @PermitAll
+    public CommonResult test(@PathVariable String deviceId){
+        CommonResult commonResult = new CommonResult();
+        commonResult.setCode(0);
+        commonResult.setMsg(deviceId);
+        IotDeviceStateUpdateReqDTO dto = new IotDeviceStateUpdateReqDTO();
+        dto.setState(1);
+        dto.setDeviceName("xxxx");
+        dto.setProductKey("xxxxxx");
+        dto.setProcessId("xxxxxxx");
+        //CommonResult<Boolean> ret = iotDeviceUpstreamApi.updateDeviceState(dto);
+
+
+        String url = "http://127.0.0.1:48080/rpc-api/iot/device/upstream/update-state";
+        CommonResult<Boolean> result = restTemplate.postForObject(url, dto,CommonResult.class);
+        return success(commonResult);
+    }
 }

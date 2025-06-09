@@ -27,7 +27,6 @@ public class IotPluginEmqxAutoConfiguration {
     public Vertx vertx() {
         return Vertx.vertx();
     }
-
     @Bean
     public MqttClient mqttClient(Vertx vertx, IotPluginEmqxProperties emqxProperties) {
         MqttClientOptions options = new MqttClientOptions()

@@ -24,7 +24,6 @@ public class IotDeviceUpstreamClient implements IotDeviceUpstreamApi {
     public static final String URL_PREFIX = "/rpc-api/iot/device/upstream";
 
     private final IotPluginCommonProperties properties;
-
     private final RestTemplate restTemplate;
 
     @Override

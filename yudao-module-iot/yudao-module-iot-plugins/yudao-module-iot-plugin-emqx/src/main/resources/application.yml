@@ -18,3 +18,4 @@ yudao:
         mqtt-topics:
           - "/sys/#"
         auth-port: 8101
+        product-key: OKycslBurvxKB5aI #后台-iot物联网-产品管理-查看

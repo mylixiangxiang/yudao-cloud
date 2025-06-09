@@ -26,7 +26,7 @@
         <module>yudao-module-erp</module>
         <module>yudao-module-ai</module>
         <module>yudao-module-iot</module>
-        <module>yudao-module-iot/yudao-module-iot-plugins/yudao-module-iot-plugin-tcp</module>
+        <module>echo-card-module</module>
     </modules>
 
     <name>${project.artifactId}</name>

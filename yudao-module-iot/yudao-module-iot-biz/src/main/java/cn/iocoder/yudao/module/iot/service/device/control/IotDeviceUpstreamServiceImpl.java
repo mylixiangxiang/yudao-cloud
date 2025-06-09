@@ -10,6 +10,7 @@ import cn.iocoder.yudao.framework.common.util.object.ObjectUtils;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.iot.api.device.dto.control.upstream.*;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.control.IotDeviceUpstreamReqVO;
+import cn.iocoder.yudao.module.iot.controller.admin.device.vo.device.IotDeviceSaveReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.enums.device.IotDeviceMessageIdentifierEnum;
 import cn.iocoder.yudao.module.iot.enums.device.IotDeviceMessageTypeEnum;
@@ -93,12 +94,48 @@ public class IotDeviceUpstreamServiceImpl implements IotDeviceUpstreamService {
                 "状态不合法");
         // 1.1 获得设备
         log.info("[updateDeviceState][更新设备状态: {}]", updateReqDTO);
+
         IotDeviceDO device = deviceService.getDeviceByProductKeyAndDeviceNameFromCache(
                 updateReqDTO.getProductKey(), updateReqDTO.getDeviceName());
         if (device == null) {
-            log.error("[updateDeviceState][设备({}/{}) 不存在]",
-                    updateReqDTO.getProductKey(), updateReqDTO.getDeviceName());
-            return;
+            if(Objects.equals(IotDeviceStateEnum.ONLINE.getState(), updateReqDTO.getState())){
+                IotDeviceRegisterReqDTO registerReqDTO = new IotDeviceRegisterReqDTO();
+                registerReqDTO.setDeviceName(updateReqDTO.getDeviceName());
+                registerReqDTO.setProductKey(registerReqDTO.getProductKey());
+                registerReqDTO.setReportTime(LocalDateTime.now());
+                registerDevice(registerReqDTO);
+
+                IotDeviceDO device2 = deviceService.getDeviceByProductKeyAndDeviceNameFromCache(
+                        updateReqDTO.getProductKey(), updateReqDTO.getDeviceName());
+
+
+//                TenantUtils.execute(device2.getTenantId(), () -> {
+//                    // 1.2 记录设备的最后时间
+//                    updateDeviceLastTime(device2, updateReqDTO);
+//                    // 1.3 当前状态一致，不处理
+//                    if (Objects.equals(device2.getState(), updateReqDTO.getState())) {
+//                        return;
+//                    }
+//
+//                    // 2. 更新设备状态
+//                    deviceService.updateDeviceState(device2.getId(), updateReqDTO.getState());
+//
+//                    // 3. TODO 芋艿：子设备的关联
+//
+//                    // 4. 发送设备消息
+//                    IotDeviceMessage message = BeanUtils.toBean(updateReqDTO, IotDeviceMessage.class)
+//                            .setType(IotDeviceMessageTypeEnum.STATE.getType())
+//                            .setIdentifier(ObjUtil.equals(updateReqDTO.getState(), IotDeviceStateEnum.ONLINE.getState())
+//                                    ? IotDeviceMessageIdentifierEnum.STATE_ONLINE.getIdentifier()
+//                                    : IotDeviceMessageIdentifierEnum.STATE_OFFLINE.getIdentifier());
+//                    sendDeviceMessage(message, device2);
+//                });
+            }else{
+                log.error("[updateDeviceState][设备({}/{}) 不存在]",
+                        updateReqDTO.getProductKey(), updateReqDTO.getDeviceName());
+                return;
+            }
+
         }
         TenantUtils.execute(device.getTenantId(), () -> {
             // 1.2 记录设备的最后时间

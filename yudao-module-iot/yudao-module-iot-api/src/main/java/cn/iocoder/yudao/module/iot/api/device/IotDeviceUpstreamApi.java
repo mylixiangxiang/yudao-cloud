@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.iot.api.device.dto.control.upstream.*;
 import cn.iocoder.yudao.module.iot.enums.ApiConstants;
 import jakarta.validation.Valid;
+import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
  *
  * @author haohao
  */
+@FeignClient(name = ApiConstants.NAME) // ① @FeignClient 注解
 public interface IotDeviceUpstreamApi {
 
     String PREFIX = ApiConstants.PREFIX + "/device/upstream";

@@ -69,7 +69,7 @@ public class IotDeviceUpstreamServer {
                 .handler(new IotDeviceAuthVertxHandler(deviceUpstreamApi));
         // 添加 Webhook 处理器，用于处理设备连接和断开连接事件
         router.post(IotDeviceWebhookVertxHandler.PATH)
-                .handler(new IotDeviceWebhookVertxHandler(deviceUpstreamApi));
+                .handler(new IotDeviceWebhookVertxHandler(deviceUpstreamApi,emqxProperties));
         // 创建 HttpServer 实例
         this.server = vertx.createHttpServer().requestHandler(router);
         this.mqttMessageHandler = new IotDeviceMqttMessageHandler(deviceUpstreamApi, client);

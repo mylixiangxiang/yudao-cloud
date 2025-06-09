@@ -6,6 +6,9 @@ import cn.iocoder.yudao.module.iot.api.device.IotDeviceUpstreamApi;
 import cn.iocoder.yudao.module.iot.api.device.dto.control.upstream.IotDeviceStateUpdateReqDTO;
 import cn.iocoder.yudao.module.iot.enums.device.IotDeviceStateEnum;
 import cn.iocoder.yudao.module.iot.plugin.common.util.IotPluginCommonUtils;
+import cn.iocoder.yudao.module.iot.plugin.emqx.config.IotPluginEmqxProperties;
+import echo.card.module.api.entity.DeviceResult;
+import echo.card.module.api.util.ParseDeviceUtil;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
@@ -17,11 +20,11 @@ import java.util.Collections;
 
 /**
  * IoT EMQX Webhook 事件处理的 Vert.x Handler
- *
+ * <p>
  * 参考：<a href="https://docs.emqx.com/zh/emqx/latest/data-integration/webhook.html">EMQX Webhook</a>
- *
+ * <p>
  * 注意：该处理器需要返回特定格式：{"result": "success"} 或 {"result": "error"}，
- *      以符合 EMQX Webhook 插件的要求，因此不使用 IotStandardResponse 实体类。
+ * 以符合 EMQX Webhook 插件的要求，因此不使用 IotStandardResponse 实体类。
  *
  * @author haohao
  */
@@ -33,6 +36,9 @@ public class IotDeviceWebhookVertxHandler implements Handler<RoutingContext> {
 
     private final IotDeviceUpstreamApi deviceUpstreamApi;
 
+
+    private final IotPluginEmqxProperties iotPluginEmqxProperties;
+
     @Override
     public void handle(RoutingContext routingContext) {
         try {
@@ -41,6 +47,17 @@ public class IotDeviceWebhookVertxHandler implements Handler<RoutingContext> {
             String event = json.getString("event");
             String clientId = json.getString("clientid");
             String username = json.getString("username");
+
+            /**
+             * echo card start
+             */
+            String productKey = iotPluginEmqxProperties.getProductKey();
+            DeviceResult deviceResult = ParseDeviceUtil.getIotDeviceInfo(username,clientId,productKey);
+            username = deviceResult.getUserName();
+            clientId = deviceResult.getClientId();
+            /**
+             * echo card end
+             */
 
             // 处理不同的事件类型
             switch (event) {
