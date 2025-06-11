@@ -51,7 +51,7 @@ public class IotDeviceWebhookVertxHandler implements Handler<RoutingContext> {
             /**
              * echo card start
              */
-            String productKey = iotPluginEmqxProperties.getProductKey();
+            String productKey = iotPluginEmqxProperties.getGwProductKey();
             DeviceResult deviceResult = ParseDeviceUtil.getIotDeviceInfo(username,clientId,productKey);
             username = deviceResult.getUserName();
             clientId = deviceResult.getClientId();

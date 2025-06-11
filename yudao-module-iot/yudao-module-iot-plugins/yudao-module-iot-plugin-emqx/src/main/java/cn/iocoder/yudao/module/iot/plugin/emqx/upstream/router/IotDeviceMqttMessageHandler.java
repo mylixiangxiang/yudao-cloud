@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.iot.plugin.emqx.upstream.router;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
@@ -9,6 +10,11 @@ import cn.iocoder.yudao.module.iot.api.device.dto.control.upstream.IotDeviceEven
 import cn.iocoder.yudao.module.iot.api.device.dto.control.upstream.IotDevicePropertyReportReqDTO;
 import cn.iocoder.yudao.module.iot.plugin.common.pojo.IotStandardResponse;
 import cn.iocoder.yudao.module.iot.plugin.common.util.IotPluginCommonUtils;
+import cn.iocoder.yudao.module.iot.plugin.emqx.config.IotPluginEmqxProperties;
+import com.alibaba.fastjson.JSON;
+import echo.card.module.api.entity.DeviceResult;
+import echo.card.module.api.entity.GwDeviceResult;
+import echo.card.module.api.util.ParseDeviceUtil;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.mqtt.MqttClient;
@@ -18,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -45,13 +52,15 @@ public class IotDeviceMqttMessageHandler {
     private static final String PROPERTY_METHOD = "thing.event.property.post";
     private static final String EVENT_METHOD_PREFIX = "thing.event.";
     private static final String EVENT_METHOD_SUFFIX = ".post";
-
+    private static final String EVENT_SUB_DEVICE_UPDATE_TOPIC_SUFFIX = "/sub/device/update";
     private final IotDeviceUpstreamApi deviceUpstreamApi;
     private final MqttClient mqttClient;
 
-    public IotDeviceMqttMessageHandler(IotDeviceUpstreamApi deviceUpstreamApi, MqttClient mqttClient) {
+    private final IotPluginEmqxProperties iotPluginEmqxProperties;
+    public IotDeviceMqttMessageHandler(IotDeviceUpstreamApi deviceUpstreamApi, MqttClient mqttClient, IotPluginEmqxProperties iotPluginEmqxProperties) {
         this.deviceUpstreamApi = deviceUpstreamApi;
         this.mqttClient = mqttClient;
+        this.iotPluginEmqxProperties = iotPluginEmqxProperties;
     }
 
     /**
@@ -94,6 +103,11 @@ public class IotDeviceMqttMessageHandler {
             handlePropertyPost(topic, payload);
             return;
         }
+        if (topic.endsWith(EVENT_SUB_DEVICE_UPDATE_TOPIC_SUFFIX)) {
+            log.info("[handleMessage][网关子设备更新][topic: {}]", topic);
+            handleSubDeviceUpdatePost(topic, payload);
+            return;
+        }
 
         // 处理设备事件上报消息
         if (topic.contains(EVENT_POST_TOPIC_PREFIX) && topic.endsWith(EVENT_POST_TOPIC_SUFFIX)) {
@@ -101,6 +115,7 @@ public class IotDeviceMqttMessageHandler {
             handleEventPost(topic, payload);
             return;
         }
+
 
         // 未知消息类型
         log.warn("[handleMessage][未知的消息类型][topic: {}]", topic);
@@ -135,6 +150,41 @@ public class IotDeviceMqttMessageHandler {
         }
     }
 
+    /**
+     * 网关子设备注册或者更新
+     *
+     * @param topic   主题
+     * @param payload 消息内容
+     */
+    private void handleSubDeviceUpdatePost(String topic, String payload) {
+        try {
+            // 解析消息内容
+
+            if(!JSONUtil.isTypeJSON(payload)){
+                return;
+            }
+            GwDeviceResult gwDeviceResult = JSON.parseObject(payload, GwDeviceResult.class);
+            if(gwDeviceResult == null){
+                return;
+            }
+
+
+            List<DeviceResult> devices = gwDeviceResult.getDevices();
+            if(CollUtil.isEmpty(devices)){
+                return;
+            }
+
+            ParseDeviceUtil.getIotDeviceInfos(gwDeviceResult,iotPluginEmqxProperties.getEcProductKey());
+            log.info("[handlePropertyPost][处理设备属性上报成功][topic: {}]", topic);
+
+            String ecProductkey;
+
+            // 发送响应消息
+            //sendResponse(topic, jsonObject, PROPERTY_METHOD, null);
+        } catch (Exception e) {
+            log.error("[handlePropertyPost][处理设备属性上报失败][topic: {}][payload: {}]", topic, payload, e);
+        }
+    }
     /**
      * 处理设备事件上报消息
      *

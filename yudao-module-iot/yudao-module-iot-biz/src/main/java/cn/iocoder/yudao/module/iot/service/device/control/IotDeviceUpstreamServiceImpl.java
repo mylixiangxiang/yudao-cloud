@@ -101,42 +101,24 @@ public class IotDeviceUpstreamServiceImpl implements IotDeviceUpstreamService {
             if(Objects.equals(IotDeviceStateEnum.ONLINE.getState(), updateReqDTO.getState())){
                 IotDeviceRegisterReqDTO registerReqDTO = new IotDeviceRegisterReqDTO();
                 registerReqDTO.setDeviceName(updateReqDTO.getDeviceName());
-                registerReqDTO.setProductKey(registerReqDTO.getProductKey());
+                registerReqDTO.setProductKey(updateReqDTO.getProductKey());
                 registerReqDTO.setReportTime(LocalDateTime.now());
                 registerDevice(registerReqDTO);
 
                 IotDeviceDO device2 = deviceService.getDeviceByProductKeyAndDeviceNameFromCache(
                         updateReqDTO.getProductKey(), updateReqDTO.getDeviceName());
-
-
-//                TenantUtils.execute(device2.getTenantId(), () -> {
-//                    // 1.2 记录设备的最后时间
-//                    updateDeviceLastTime(device2, updateReqDTO);
-//                    // 1.3 当前状态一致，不处理
-//                    if (Objects.equals(device2.getState(), updateReqDTO.getState())) {
-//                        return;
-//                    }
-//
-//                    // 2. 更新设备状态
-//                    deviceService.updateDeviceState(device2.getId(), updateReqDTO.getState());
-//
-//                    // 3. TODO 芋艿：子设备的关联
-//
-//                    // 4. 发送设备消息
-//                    IotDeviceMessage message = BeanUtils.toBean(updateReqDTO, IotDeviceMessage.class)
-//                            .setType(IotDeviceMessageTypeEnum.STATE.getType())
-//                            .setIdentifier(ObjUtil.equals(updateReqDTO.getState(), IotDeviceStateEnum.ONLINE.getState())
-//                                    ? IotDeviceMessageIdentifierEnum.STATE_ONLINE.getIdentifier()
-//                                    : IotDeviceMessageIdentifierEnum.STATE_OFFLINE.getIdentifier());
-//                    sendDeviceMessage(message, device2);
-//                });
+                reportDeviceStatus(device2,updateReqDTO);
             }else{
                 log.error("[updateDeviceState][设备({}/{}) 不存在]",
                         updateReqDTO.getProductKey(), updateReqDTO.getDeviceName());
-                return;
             }
+            return;
 
         }
+        reportDeviceStatus(device,updateReqDTO);
+    }
+
+    private void reportDeviceStatus(IotDeviceDO device,IotDeviceStateUpdateReqDTO updateReqDTO){
         TenantUtils.execute(device.getTenantId(), () -> {
             // 1.2 记录设备的最后时间
             updateDeviceLastTime(device, updateReqDTO);
@@ -159,7 +141,6 @@ public class IotDeviceUpstreamServiceImpl implements IotDeviceUpstreamService {
             sendDeviceMessage(message, device);
         });
     }
-
     @Override
     public void reportDeviceProperty(IotDevicePropertyReportReqDTO reportReqDTO) {
         // 1.1 获得设备

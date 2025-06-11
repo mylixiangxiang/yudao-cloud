@@ -48,8 +48,13 @@ public class IotPluginEmqxProperties {
     private Integer authPort;
 
     /**
-     * 为了兼容echo card设备
+     * 为了兼容echo card网关设备
      */
-    private String productKey;
+    private String gwProductKey;
+
+    /**
+     * 为了兼容echo card网关子设备
+     */
+    private String ecProductKey;
 
 }

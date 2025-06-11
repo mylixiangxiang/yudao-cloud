@@ -69,10 +69,10 @@ public class IotDeviceUpstreamServer {
                 .handler(new IotDeviceAuthVertxHandler(deviceUpstreamApi));
         // 添加 Webhook 处理器，用于处理设备连接和断开连接事件
         router.post(IotDeviceWebhookVertxHandler.PATH)
-                .handler(new IotDeviceWebhookVertxHandler(deviceUpstreamApi,emqxProperties));
+                .handler(new IotDeviceWebhookVertxHandler(deviceUpstreamApi, emqxProperties));
         // 创建 HttpServer 实例
         this.server = vertx.createHttpServer().requestHandler(router);
-        this.mqttMessageHandler = new IotDeviceMqttMessageHandler(deviceUpstreamApi, client);
+        this.mqttMessageHandler = new IotDeviceMqttMessageHandler(deviceUpstreamApi, client, emqxProperties);
     }
 
     /**
@@ -215,17 +215,17 @@ public class IotDeviceUpstreamServer {
             // 关闭 MQTT 客户端
             if (client != null) {
                 client.disconnect()
-                       .toCompletionStage()
-                       .toCompletableFuture()
-                       .join();
+                        .toCompletionStage()
+                        .toCompletableFuture()
+                        .join();
             }
 
             // 关闭 Vertx 实例
-            if (vertx!= null) {
+            if (vertx != null) {
                 vertx.close()
-                      .toCompletionStage()
-                      .toCompletableFuture()
-                      .join();
+                        .toCompletionStage()
+                        .toCompletableFuture()
+                        .join();
             }
             log.info("[stop][关闭完成]");
         } catch (Exception e) {
