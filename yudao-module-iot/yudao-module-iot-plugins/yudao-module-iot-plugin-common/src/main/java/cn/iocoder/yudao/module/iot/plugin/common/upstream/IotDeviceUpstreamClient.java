@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.List;
+
 import static cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants.INTERNAL_SERVER_ERROR;
 
 /**
@@ -30,6 +32,12 @@ public class IotDeviceUpstreamClient implements IotDeviceUpstreamApi {
     public CommonResult<Boolean> updateDeviceState(IotDeviceStateUpdateReqDTO updateReqDTO) {
         String url = properties.getUpstreamUrl() + URL_PREFIX + "/update-state";
         return doPost(url, updateReqDTO);
+    }
+
+    @Override
+    public CommonResult<Boolean> updateDeviceStateList( List<IotDeviceStateUpdateReqDTO> updateReqDTOs,String deviceKey) {
+        String url = properties.getUpstreamUrl() + URL_PREFIX + "/update-state-list/"+deviceKey;
+        return doPost(url, updateReqDTOs);
     }
 
     @Override

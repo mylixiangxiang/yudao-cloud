@@ -39,6 +39,7 @@ public class IotDeviceDO extends TenantBaseDO {
      * 类似阿里云 <a href="https://help.aliyun.com/zh/iot/developer-reference/api-querydeviceinfo">QueryDeviceInfo</a> 的 IotInstanceId
      */
     private String deviceKey;
+    
     /**
      * 设备名称，在产品内唯一，用于标识设备
      */

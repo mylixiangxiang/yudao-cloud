@@ -36,6 +36,7 @@ public abstract class IotDeviceUpstreamAbstractReqDTO {
     @NotEmpty(message = "设备名称不能为空")
     private String deviceName;
 
+    private String deviceKey;
     /**
      * 上报时间
      */

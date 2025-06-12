@@ -5,8 +5,11 @@ import cn.iocoder.yudao.module.iot.api.device.dto.control.upstream.*;
 import cn.iocoder.yudao.module.iot.enums.ApiConstants;
 import jakarta.validation.Valid;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+
+import java.util.List;
 
 /**
  * 设备数据 Upstream 上行 API
@@ -30,6 +33,9 @@ public interface IotDeviceUpstreamApi {
     @PostMapping(PREFIX + "/update-state")
     CommonResult<Boolean> updateDeviceState(@Valid @RequestBody IotDeviceStateUpdateReqDTO updateReqDTO);
 
+
+    @PostMapping(PREFIX + "/update-state-list/{deviceKey}")
+    CommonResult<Boolean> updateDeviceStateList(@Valid @RequestBody List<IotDeviceStateUpdateReqDTO> updateReqDTOs, @PathVariable("deviceKey") String deviceKey);
     /**
      * 上报设备属性数据
      *

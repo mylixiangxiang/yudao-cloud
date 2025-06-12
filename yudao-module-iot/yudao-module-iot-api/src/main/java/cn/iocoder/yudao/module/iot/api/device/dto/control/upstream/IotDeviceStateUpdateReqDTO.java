@@ -20,4 +20,7 @@ public class IotDeviceStateUpdateReqDTO extends IotDeviceUpstreamAbstractReqDTO 
     @InEnum(IotDeviceStateEnum.class) // 只使用：在线、离线
     private Integer state;
 
+    private Long gateWayId;
+
+
 }

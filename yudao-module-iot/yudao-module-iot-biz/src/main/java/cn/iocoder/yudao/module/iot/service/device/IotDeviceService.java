@@ -39,7 +39,10 @@ public interface IotDeviceService {
     IotDeviceDO createDevice(@NotEmpty(message = "产品标识不能为空") String productKey,
                              @NotEmpty(message = "设备名称不能为空") String deviceName,
                              Long gatewayId);
-
+    IotDeviceDO createDeviceAndActive(@NotEmpty(message = "产品标识不能为空") String productKey,
+                             @NotEmpty(message = "设备名称不能为空") String deviceName,
+                             @NotEmpty(message = "设备KEY不能为空") String deviceKey,
+                             Long gatewayId);
     /**
      * 更新设备
      *

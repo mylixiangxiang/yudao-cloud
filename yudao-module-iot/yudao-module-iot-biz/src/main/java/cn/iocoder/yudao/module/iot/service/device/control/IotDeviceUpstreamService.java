@@ -4,6 +4,8 @@ import cn.iocoder.yudao.module.iot.api.device.dto.control.upstream.*;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.control.IotDeviceUpstreamReqVO;
 import jakarta.validation.Valid;
 
+import java.util.List;
+
 /**
  * IoT 设备上行 Service 接口
  *
@@ -27,6 +29,13 @@ public interface IotDeviceUpstreamService {
      */
     void updateDeviceState(IotDeviceStateUpdateReqDTO updateReqDTO);
 
+
+    /**
+     * 批量更新设备状态
+     * @param deviceKey
+     * @param updateReqDTOs
+     */
+    void updateDeviceStateList(String deviceKey, List<IotDeviceStateUpdateReqDTO> updateReqDTOs);
     /**
      * 上报设备属性数据
      *
@@ -48,6 +57,13 @@ public interface IotDeviceUpstreamService {
      */
     void registerDevice(IotDeviceRegisterReqDTO registerReqDTO);
 
+
+    /**
+     * 注册设备
+     *
+     * @param registerReqDTO 设备连接注册设备 DTO
+     */
+    void registerConnectedDevice(IotDeviceRegisterReqDTO registerReqDTO);
     /**
      * 注册子设备
      *

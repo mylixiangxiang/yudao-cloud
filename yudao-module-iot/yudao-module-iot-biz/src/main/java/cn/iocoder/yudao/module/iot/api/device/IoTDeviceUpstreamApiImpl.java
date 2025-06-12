@@ -1,12 +1,16 @@
 package cn.iocoder.yudao.module.iot.api.device;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.iot.api.device.dto.control.upstream.*;
 import cn.iocoder.yudao.module.iot.service.device.control.IotDeviceUpstreamService;
 import cn.iocoder.yudao.module.iot.service.plugin.IotPluginInstanceService;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
@@ -15,6 +19,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
  */
 @RestController
 @Validated
+@Slf4j
 public class IoTDeviceUpstreamApiImpl implements IotDeviceUpstreamApi {
 
     @Resource
@@ -27,6 +32,14 @@ public class IoTDeviceUpstreamApiImpl implements IotDeviceUpstreamApi {
     @Override
     public CommonResult<Boolean> updateDeviceState(IotDeviceStateUpdateReqDTO updateReqDTO) {
         deviceUpstreamService.updateDeviceState(updateReqDTO);
+        return success(true);
+    }
+
+    @Override
+    @TenantIgnore
+    public CommonResult<Boolean> updateDeviceStateList(List<IotDeviceStateUpdateReqDTO> updateReqDTOs,String deviceKey) {
+        deviceUpstreamService.updateDeviceStateList(deviceKey,updateReqDTOs);
+        log.info("updateDeviceStateList");
         return success(true);
     }
 

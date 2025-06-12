@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.iot.api.device.dto.control.upstream.*;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.control.IotDeviceUpstreamReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.device.IotDeviceSaveReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
 import cn.iocoder.yudao.module.iot.enums.device.IotDeviceMessageIdentifierEnum;
 import cn.iocoder.yudao.module.iot.enums.device.IotDeviceMessageTypeEnum;
 import cn.iocoder.yudao.module.iot.enums.device.IotDeviceStateEnum;
@@ -21,6 +22,7 @@ import cn.iocoder.yudao.module.iot.mq.producer.device.IotDeviceProducer;
 import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
 import cn.iocoder.yudao.module.iot.service.device.data.IotDevicePropertyService;
 import cn.iocoder.yudao.module.iot.service.plugin.IotPluginInstanceService;
+import cn.iocoder.yudao.module.iot.service.product.IotProductService;
 import cn.iocoder.yudao.module.iot.util.MqttSignUtils;
 import cn.iocoder.yudao.module.iot.util.MqttSignUtils.MqttSignResult;
 import jakarta.annotation.Resource;
@@ -29,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -51,6 +54,10 @@ public class IotDeviceUpstreamServiceImpl implements IotDeviceUpstreamService {
 
     @Resource
     private IotDeviceProducer deviceProducer;
+
+
+    @Resource
+    private IotProductService iotProductService;
 
     @Override
     @SuppressWarnings("unchecked")
@@ -103,8 +110,9 @@ public class IotDeviceUpstreamServiceImpl implements IotDeviceUpstreamService {
                 registerReqDTO.setDeviceName(updateReqDTO.getDeviceName());
                 registerReqDTO.setProductKey(updateReqDTO.getProductKey());
                 registerReqDTO.setReportTime(LocalDateTime.now());
-                registerDevice(registerReqDTO);
-
+                registerReqDTO.setGateWayId(updateReqDTO.getGateWayId());
+                registerReqDTO.setDeviceKey(updateReqDTO.getDeviceKey());
+                registerConnectedDevice(registerReqDTO);
                 IotDeviceDO device2 = deviceService.getDeviceByProductKeyAndDeviceNameFromCache(
                         updateReqDTO.getProductKey(), updateReqDTO.getDeviceName());
                 reportDeviceStatus(device2,updateReqDTO);
@@ -116,6 +124,22 @@ public class IotDeviceUpstreamServiceImpl implements IotDeviceUpstreamService {
 
         }
         reportDeviceStatus(device,updateReqDTO);
+    }
+
+    @Override
+    public void updateDeviceStateList(String deviceKey, List<IotDeviceStateUpdateReqDTO> updateReqDTOs) {
+        IotDeviceDO iotDeviceDO = deviceService.getDeviceByDeviceKey(deviceKey);
+        if(iotDeviceDO == null){
+            log.error("[updateDeviceStateList][网关设备不存在({}) ]",deviceKey);
+            return;
+        }
+        for(int i=0;i<updateReqDTOs.size();i++){
+            IotDeviceStateUpdateReqDTO device = updateReqDTOs.get(i);
+            device.setGateWayId(iotDeviceDO.getId());
+            updateDeviceState(device);
+        }
+
+
     }
 
     private void reportDeviceStatus(IotDeviceDO device,IotDeviceStateUpdateReqDTO updateReqDTO){
@@ -191,6 +215,12 @@ public class IotDeviceUpstreamServiceImpl implements IotDeviceUpstreamService {
         registerDevice0(registerReqDTO.getProductKey(), registerReqDTO.getDeviceName(), null, registerReqDTO);
     }
 
+    @Override
+    public void registerConnectedDevice(IotDeviceRegisterReqDTO registerReqDTO) {
+        log.info("[registerDevice][注册设备: {}]", registerReqDTO);
+        registerDevice1(registerReqDTO.getProductKey(), registerReqDTO.getDeviceName(), registerReqDTO.getGateWayId(), registerReqDTO);
+    }
+
     private void registerDevice0(String productKey, String deviceName, Long gatewayId,
             IotDeviceUpstreamAbstractReqDTO registerReqDTO) {
         // 1.1 注册设备
@@ -218,6 +248,34 @@ public class IotDeviceUpstreamServiceImpl implements IotDeviceUpstreamService {
         }
     }
 
+    private void registerDevice1(String productKey, String deviceName, Long gatewayId,
+                                 IotDeviceUpstreamAbstractReqDTO registerReqDTO) {
+        // 1.1 注册设备
+        IotDeviceDO device = deviceService.getDeviceByProductKeyAndDeviceNameFromCache(productKey, deviceName);
+        boolean registerNew = device == null;
+        if (device == null) {
+
+            deviceService.createDeviceAndActive(productKey,deviceName,registerReqDTO.getDeviceKey(),gatewayId);
+            log.info("[registerDevice0][消息({}) 设备({}/{}) 成功注册]", registerReqDTO, productKey, device);
+            return;
+        } else if (gatewayId != null && ObjUtil.notEqual(device.getGatewayId(), gatewayId)) {
+            Long deviceId = device.getId();
+            TenantUtils.execute(device.getTenantId(),
+                    () -> deviceService.updateDeviceGateway(deviceId, gatewayId));
+            log.info("[registerDevice0][消息({}) 设备({}/{}) 更新网关设备编号({})]",
+                    registerReqDTO, productKey, device, gatewayId);
+        }
+        // 1.2 记录设备的最后时间
+        updateDeviceLastTime(device, registerReqDTO);
+
+        // 2. 发送设备消息
+        if (registerNew) {
+            IotDeviceMessage message = BeanUtils.toBean(registerReqDTO, IotDeviceMessage.class)
+                    .setType(IotDeviceMessageTypeEnum.REGISTER.getType())
+                    .setIdentifier(IotDeviceMessageIdentifierEnum.REGISTER_REGISTER.getIdentifier());
+            sendDeviceMessage(message, device);
+        }
+    }
     @Override
     public void registerSubDevice(IotDeviceRegisterSubReqDTO registerReqDTO) {
         // 1.1 注册子设备

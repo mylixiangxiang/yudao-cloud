@@ -7,4 +7,5 @@ public class DeviceResult {
     private Integer slaveId;
     private String clientId;
     private String userName;
+    private String deviceKey;
 }

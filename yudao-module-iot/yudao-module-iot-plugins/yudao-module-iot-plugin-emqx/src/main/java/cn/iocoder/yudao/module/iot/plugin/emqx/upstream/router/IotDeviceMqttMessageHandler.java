@@ -4,10 +4,13 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.iot.api.device.IotDeviceUpstreamApi;
 import cn.iocoder.yudao.module.iot.api.device.dto.control.upstream.IotDeviceEventReportReqDTO;
 import cn.iocoder.yudao.module.iot.api.device.dto.control.upstream.IotDevicePropertyReportReqDTO;
+import cn.iocoder.yudao.module.iot.api.device.dto.control.upstream.IotDeviceStateUpdateReqDTO;
+import cn.iocoder.yudao.module.iot.enums.device.IotDeviceStateEnum;
 import cn.iocoder.yudao.module.iot.plugin.common.pojo.IotStandardResponse;
 import cn.iocoder.yudao.module.iot.plugin.common.util.IotPluginCommonUtils;
 import cn.iocoder.yudao.module.iot.plugin.emqx.config.IotPluginEmqxProperties;
@@ -22,10 +25,7 @@ import io.vertx.mqtt.messages.MqttPublishMessage;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * IoT 设备 MQTT 消息处理器
@@ -52,7 +52,7 @@ public class IotDeviceMqttMessageHandler {
     private static final String PROPERTY_METHOD = "thing.event.property.post";
     private static final String EVENT_METHOD_PREFIX = "thing.event.";
     private static final String EVENT_METHOD_SUFFIX = ".post";
-    private static final String EVENT_SUB_DEVICE_UPDATE_TOPIC_SUFFIX = "/sub/device/update";
+    private static final String EVENT_MQTT_DEVICE_UPDATE_TOPIC_SUFFIX = "/mqtt/device/update";
     private final IotDeviceUpstreamApi deviceUpstreamApi;
     private final MqttClient mqttClient;
 
@@ -103,9 +103,9 @@ public class IotDeviceMqttMessageHandler {
             handlePropertyPost(topic, payload);
             return;
         }
-        if (topic.endsWith(EVENT_SUB_DEVICE_UPDATE_TOPIC_SUFFIX)) {
-            log.info("[handleMessage][网关子设备更新][topic: {}]", topic);
-            handleSubDeviceUpdatePost(topic, payload);
+        if (topic.endsWith(EVENT_MQTT_DEVICE_UPDATE_TOPIC_SUFFIX)) {
+            log.info("[handleMessage][MQTT设备更新][topic: {}]", topic);
+            handleMqttDeviceUpdatePost(topic, payload);
             return;
         }
 
@@ -156,28 +156,49 @@ public class IotDeviceMqttMessageHandler {
      * @param topic   主题
      * @param payload 消息内容
      */
-    private void handleSubDeviceUpdatePost(String topic, String payload) {
+    private void handleMqttDeviceUpdatePost(String topic, String payload) {
         try {
             // 解析消息内容
 
             if(!JSONUtil.isTypeJSON(payload)){
+                log.error("[handleMqttDeviceUpdatePost][处理MQTT设备更新错误，payload为空][topic: {}]", topic);
                 return;
             }
             GwDeviceResult gwDeviceResult = JSON.parseObject(payload, GwDeviceResult.class);
             if(gwDeviceResult == null){
+                log.error("[handleMqttDeviceUpdatePost][处理MQTT设备更新错误，GwDeviceResult为空][object: {}]", topic);
                 return;
             }
 
 
             List<DeviceResult> devices = gwDeviceResult.getDevices();
             if(CollUtil.isEmpty(devices)){
+                log.error("[handleMqttDeviceUpdatePost][处理MQTT设备更新错误，DeviceResult为空][object: {}]", topic);
                 return;
             }
 
             ParseDeviceUtil.getIotDeviceInfos(gwDeviceResult,iotPluginEmqxProperties.getEcProductKey());
-            log.info("[handlePropertyPost][处理设备属性上报成功][topic: {}]", topic);
+            log.info("[handleMqttDeviceUpdatePost][处理MQTT设备更新上报成功][topic: {}]", topic);
+            // 更新设备状态为在线
+            List<IotDeviceStateUpdateReqDTO> updateReqDTOs=new ArrayList<>();
 
-            String ecProductkey;
+            for(int i = 0 ; i < devices.size() ;i++){
+                DeviceResult deviceResult = devices.get(i);
+                String[] parts = ParseDeviceUtil.parseUsername(deviceResult.getUserName());
+                if (parts == null) {
+                    continue;
+                }
+                IotDeviceStateUpdateReqDTO updateReqDTO = new IotDeviceStateUpdateReqDTO();
+                updateReqDTO.setProductKey(parts[1]);
+                updateReqDTO.setDeviceName(parts[0]);
+                updateReqDTO.setState(IotDeviceStateEnum.ONLINE.getState());
+                updateReqDTO.setProcessId(IotPluginCommonUtils.getProcessId());
+                updateReqDTO.setReportTime(LocalDateTime.now());
+                updateReqDTO.setDeviceKey(deviceResult.getDeviceKey());
+                updateReqDTOs.add(updateReqDTO);
+                String deviceKey = gwDeviceResult.getGateWayKey();
+                CommonResult<Boolean> result = deviceUpstreamApi.updateDeviceStateList(updateReqDTOs,deviceKey);
+            }
 
             // 发送响应消息
             //sendResponse(topic, jsonObject, PROPERTY_METHOD, null);

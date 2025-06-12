@@ -22,6 +22,8 @@ import cn.iocoder.yudao.module.iot.enums.product.IotProductDeviceTypeEnum;
 import cn.iocoder.yudao.module.iot.service.product.IotProductService;
 import cn.iocoder.yudao.module.iot.util.MqttSignUtils;
 import cn.iocoder.yudao.module.iot.util.MqttSignUtils.MqttSignResult;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.annotation.Resource;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import javax.annotation.Nullable;
+import java.sql.Wrapper;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -101,6 +104,31 @@ public class IotDeviceServiceImpl implements IotDeviceService {
         });
     }
 
+    @Override
+    public IotDeviceDO createDeviceAndActive(String productKey, String deviceName, String deviceKey, Long gatewayId) {
+        String mDeviceKey = deviceKey;
+        if (StrUtil.isEmpty(deviceKey)) {
+            mDeviceKey = generateDeviceKey();
+        }
+        // 1.1 校验产品是否存在
+        IotProductDO product = TenantUtils.executeIgnore(() -> productService.getProductByProductKey(productKey));
+        if (product == null) {
+            throw exception(PRODUCT_NOT_EXISTS);
+        }
+        String finalMDeviceKey = mDeviceKey;
+        return TenantUtils.execute(product.getTenantId(), () -> {
+            // 1.2 校验设备名称在同一产品下是否唯一
+            validateCreateDeviceParam(productKey, deviceName, finalMDeviceKey, gatewayId, product);
+
+            // 2. 插入到数据库
+            IotDeviceDO device = new IotDeviceDO().setDeviceName(deviceName).setDeviceKey(finalMDeviceKey)
+                    .setGatewayId(gatewayId);
+            activeDevice(device, product);
+            deviceMapper.insert(device);
+            return device;
+        });
+    }
+
     private void validateCreateDeviceParam(String productKey, String deviceName, String deviceKey,
                                            Long gatewayId, IotProductDO product) {
         TenantUtils.executeIgnore(() -> {
@@ -129,7 +157,14 @@ public class IotDeviceServiceImpl implements IotDeviceService {
         // 设置设备状态为未激活
         device.setState(IotDeviceStateEnum.INACTIVE.getState());
     }
-
+    private void activeDevice(IotDeviceDO device, IotProductDO product) {
+        device.setProductId(product.getId()).setProductKey(product.getProductKey())
+                .setDeviceType(product.getDeviceType());
+        // 生成密钥
+        device.setDeviceSecret(generateDeviceSecret());
+        // 设置设备状态为未激活
+        device.setState(IotDeviceStateEnum.ONLINE.getState());
+    }
     @Override
     public void updateDevice(IotDeviceSaveReqVO updateReqVO) {
         updateReqVO.setDeviceKey(null).setDeviceName(null).setProductId(null); // 不允许更新
@@ -147,10 +182,30 @@ public class IotDeviceServiceImpl implements IotDeviceService {
         IotDeviceDO updateObj = BeanUtils.toBean(updateReqVO, IotDeviceDO.class);
         deviceMapper.updateById(updateObj);
 
+
+//        if(IotProductDeviceTypeEnum.isGateway(device.getDeviceType()) && IotDeviceStateEnum.isOnline(updateObj.getState())){
+//            subDeviceOffline(device.getId());
+//        }
+
         // 3. 清空对应缓存
         deleteDeviceCache(device);
     }
 
+    private void subDeviceOffline(Long gateWayId){
+        IotDeviceDO updateIotDeviceDO = new IotDeviceDO();
+        updateIotDeviceDO.setState(IotDeviceStateEnum.OFFLINE.getState());
+        LambdaUpdateWrapper<IotDeviceDO> updateWrapper= new LambdaUpdateWrapper<>();
+        updateWrapper.eq(IotDeviceDO::getGatewayId,gateWayId);
+        deviceMapper.update(updateIotDeviceDO,updateWrapper);
+
+
+        LambdaQueryWrapper<IotDeviceDO> queryWrapper= new LambdaQueryWrapper<>();
+        queryWrapper.eq(IotDeviceDO::getGatewayId,gateWayId);
+
+
+        List<IotDeviceDO> list = deviceMapper.selectList(queryWrapper);
+        deleteDeviceCache(list);
+    }
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateDeviceGroup(IotDeviceUpdateGroupReqVO updateReqVO) {
@@ -175,7 +230,7 @@ public class IotDeviceServiceImpl implements IotDeviceService {
         // 1.1 校验存在
         IotDeviceDO device = validateDeviceExists(id);
         // 1.2 如果是网关设备，检查是否有子设备
-        if (device.getGatewayId() != null && deviceMapper.selectCountByGatewayId(id) > 0) {
+        if (IotProductDeviceTypeEnum.isGateway(device.getDeviceType()) && deviceMapper.selectCountByGatewayId(id) > 0) {
             throw exception(DEVICE_HAS_CHILDREN);
         }
 
@@ -287,6 +342,9 @@ public class IotDeviceServiceImpl implements IotDeviceService {
             updateObj.setOfflineTime(LocalDateTime.now());
         }
         deviceMapper.updateById(updateObj);
+        if(IotProductDeviceTypeEnum.isGateway(device.getDeviceType()) && !IotDeviceStateEnum.isOnline(updateObj.getState())){
+            subDeviceOffline(device.getId());
+        }
 
         // 3. 清空对应缓存
         deleteDeviceCache(device);
@@ -436,8 +494,8 @@ public class IotDeviceServiceImpl implements IotDeviceService {
         // 查询结果转换成Map
         List<Map<String, Object>> list = deviceMapper.selectDeviceCountMapByProductId();
         return list.stream().collect(Collectors.toMap(
-            map -> Long.valueOf(map.get("key").toString()),
-            map -> Integer.valueOf(map.get("value").toString())
+                map -> Long.valueOf(map.get("key").toString()),
+                map -> Integer.valueOf(map.get("value").toString())
         ));
     }
 
@@ -446,8 +504,8 @@ public class IotDeviceServiceImpl implements IotDeviceService {
         // 查询结果转换成Map
         List<Map<String, Object>> list = deviceMapper.selectDeviceCountGroupByState();
         return list.stream().collect(Collectors.toMap(
-            map -> Integer.valueOf(map.get("key").toString()),
-            map -> Long.valueOf(map.get("value").toString())
+                map -> Integer.valueOf(map.get("key").toString()),
+                map -> Long.valueOf(map.get("value").toString())
         ));
     }
 
